@@ -94,13 +94,6 @@ class CashRegister
     calculateChange
   end
 
-# c = CashRegister.new
-# c.run
-
-#The system will supply the number of quarters, dimes, nickels, and pennies that should be issued for the change due.
-#19.66- dollar: 19, quarter: 2, dime: 1, nickel: 1, penny: 1
-#10.48- dollar: 10, quarter:1, nickel: 0, dime:2, penny:3
-
   def calculate_coins(change)
     coin_values = {dollar: 100, quarter: 25, dime: 10, nickel: 5, penny: 1}
     num_of_pennies= (change * 100).to_i
@@ -118,7 +111,6 @@ class CashRegister
   end
 
   def print_coins(coins)
-    # coins = {dollar: dollar, quarter: quarter, dime: dime, nickel: nickel, penny: penny}
     puts "You should issue:"
     coins.each do |coin, value|
       puts "#{coin}: #{value}"
