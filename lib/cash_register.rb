@@ -69,6 +69,8 @@ class CashRegister
       puts "Exact amount tendered. Thank you!"
     elsif change > 0
       puts "Your change is" + " $#{change}"
+      coins = calculate_coins(change)
+      print_coins(coins)
     else
       not_enough_money(change)
     end
@@ -91,7 +93,35 @@ class CashRegister
     end
     calculateChange
   end
-end
 
 # c = CashRegister.new
 # c.run
+
+#The system will supply the number of quarters, dimes, nickels, and pennies that should be issued for the change due.
+#19.66- dollar: 19, quarter: 2, dime: 1, nickel: 1, penny: 1
+#10.48- dollar: 10, quarter:1, nickel: 0, dime:2, penny:3
+
+  def calculate_coins(change)
+    coin_values = {dollar: 100, quarter: 25, dime: 10, nickel: 5, penny: 1}
+    num_of_pennies= (change * 100).to_i
+
+    dollar = num_of_pennies/coin_values[:dollar]
+    remainder  = num_of_pennies%coin_values[:dollar]
+    quarter = remainder/coin_values[:quarter]
+    remainder = remainder%coin_values[:quarter]
+    dime = remainder/coin_values[:dime]
+    remainder = remainder%coin_values[:dime]
+    nickel = remainder/coin_values[:nickel]
+    remainder = remainder%coin_values[:nickel]
+    penny = remainder/coin_values[:penny]
+    return {dollar: dollar, quarter: quarter, dime: dime, nickel: nickel, penny: penny}
+  end
+
+  def print_coins(coins)
+    # coins = {dollar: dollar, quarter: quarter, dime: dime, nickel: nickel, penny: penny}
+    puts "You should issue:"
+    coins.each do |coin, value|
+      puts "#{coin}: #{value}"
+    end
+  end
+end
