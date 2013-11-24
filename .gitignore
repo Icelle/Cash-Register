@@ -1,0 +1,5 @@
+spec/
+old/
+Gemfile
+Gemfile.lock
+Guardfile
