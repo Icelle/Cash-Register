@@ -7,50 +7,125 @@
 #program validate price
 #user prompted "price tendered?"
 #program calculate change + conditions
+#program count coins
 
+require 'csv'
+require 'pry'
+require 'json'
+require './lib/report.rb'
 
 class CashRegister
-  attr_accessor :prices, :money_received
-
   def initialize
-    @prices = []
+    @trans_file = './assets/transactions.json'
+    @product_catalog = init_product_catalog
+    @report = Report.new
+
+    @money_received = 0.0
+    @qty = init_qty
+  end
+
+  def init_qty
+    qty = {}
+    @product_catalog.keys.each do |k|
+      qty[k] = 0
+    end
+    return qty
+  end
+
+  def init_product_catalog
+    product_catalog = {}
+    csv = CSV.table("./assets/product_catalog.csv")
+    headers = csv.headers
+    products = csv.to_a
+    # remove header from collection
+    products.delete_at(0)
+    products.each do |product|
+      # assume the first entry is ALWAYS ID
+      # convert all values in csv to their k/v pairs
+      product_catalog[product[0].to_s] = Hash[headers.zip(product)]
+    end
+    product_catalog
+  end
+
+  def run(is_open = true)
+    if is_open
+      is_done = false
+      until is_done do
+        puts "Please enter ID number."
+        id = gets.chomp
+        if is_done?(id)
+          is_done = true
+        else
+          id = validate_id(id)
+          puts "Please enter quantity"
+          qty = validate_qty(gets.chomp)
+          @qty[id] = @qty[id] + qty
+        end
+      end
+
+      #puts summary of all items bought and their quantity and the total $.
+      @product_catalog.each do |id, prod_info|
+        puts "#{prod_info[:name]} #{@qty[id]}"
+      end
+      puts "Total: $" + subtotal.to_s + "."
+
+      puts "What is the amount tendered?"
+      @money_received = gets.chomp
+      while !is_valid?(@money_received) do
+        puts "INVALID CHANGE. Please put valid change."
+        puts "What is the amount tendered?"
+        @money_received = gets.chomp
+      end
+      @money_received = @money_received.to_f
+      calculate_change
+      puts Time.now.getutc.to_s + " - Transaction complete!"
+      store_transaction
+      reset
+      register_prompt
+    end
+  end
+
+  def register_prompt
+    puts "Type 'close' to close register or 'enter' to continue or 'report' to generate report."
+    action = gets.chomp
+    if action == 'close'
+      is_open = false
+      run(is_open)
+    elsif action == 'report'
+      @report.run
+      register_prompt
+    else
+      run
+    end
+  end
+
+  def reset
+    @qty = init_qty
     @money_received = 0.0
   end
 
-  def run
-    puts "What is the sale price?"
-    price = gets.chomp
-
-    until is_done?(price) do
-      if is_valid?(price)
-        @prices.push(price.to_f)
-        puts "Subtotal: $" + subtotal.to_s + "."
-      else
-        puts "INVALID PRICE. Please put valid price."
-      end
-      puts "What is the sale price?"
-      price = gets.chomp
+  def validate_id(id)
+    while !@product_catalog.keys.include?(id)
+      puts "Invalid product id."
+      puts "Please enter ID number."
+      id = gets.chomp
     end
+    return id
+  end
 
-    puts "Total: $" + subtotal.to_s + "."
-
-    puts "What is the amount tendered?"
-    @money_received = gets.chomp
-    while !is_valid?(@money_received) do
-      puts "INVALID CHANGE. Please put valid change."
-      puts "What is the amount tendered?"
-      @money_received = gets.chomp
+  def validate_qty(qty)
+    while !qty.match(/\A\d+\z/)
+      puts "Invalid quantity. Please enter valid quantity."
+      qty = gets.chomp
     end
-    @money_received = money_received.to_f
-    calculateChange
-    initialize # reset the object so that state doesn't carry from one transaction to the next
-    puts Time.now.getutc.to_s + " - Transaction complete!"
+    return qty.to_i
   end
 
   def subtotal
     sum = 0
-    @prices.each do |price|
-      sum = sum + price
+    @qty.each do |id, qty|
+      price = @product_catalog[id][:price]
+      sum = sum + qty * price
     end
     return sum
   end
@@ -63,7 +138,7 @@ class CashRegister
     return !input.match(/\A\d+(\.\d{1,2})?\z/).nil?
   end
 
-  def calculateChange
+  def calculate_change
     change = @money_received - subtotal
     if change == 0
       puts "Exact amount tendered. Thank you!"
@@ -91,7 +166,7 @@ class CashRegister
       @money_received = @money_received.to_f
       change = @money_received - subtotal
     end
-    calculateChange
+    calculate_change
   end
 
   def calculate_coins(change)
@@ -116,4 +191,33 @@ class CashRegister
       puts "#{coin}: #{value}"
     end
   end
+
+  def store_transaction
+    # find only the items purchases
+    products_purchased = @qty.reject {|k,v| v == 0}
+    transactions = []
+    products_purchased.each do |k,v|
+      transactions.push({
+        id: k,
+        qty: v,
+        sku: @product_catalog[k][:sku],
+        price: @product_catalog[k][:price],
+        cost: @product_catalog[k][:cost]
+        }
+      )
+    end
+
+    order_data = {order: transactions, time: Time.new.to_i}
+
+    write_transaction(order_data)
+  end
+
+  def write_transaction(t)
+    File.open(@trans_file, 'a+') do |file|
+      file.write(t.to_json+"\n") #convert each transaction to json
+    end
+  end
 end
+
+c = CashRegister.new
+c.run
